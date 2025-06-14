@@ -5,6 +5,7 @@ namespace ElFarmawy\VdoCipher\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use ElFarmawy\VdoCipher\Contracts\VdoCipherInterface;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Config;
 
 class VdoCipherService implements VdoCipherInterface
@@ -36,10 +37,10 @@ class VdoCipherService implements VdoCipherInterface
      */
     public function __construct()
     {
-        $this->apiKey = Config::get('vdocipher.api_key', '');
-        $this->baseUrl = Config::get('vdocipher.base_url', 'https://dev.vdocipher.com/api');
+        $this->apiKey     = Config::get('vdocipher.api_key', '');
+        $this->baseUrl    = Config::get('vdocipher.base_url', 'https://dev.vdocipher.com/api');
         $this->watermarks = Config::get('vdocipher.watermarks', []);
-        $this->otpTtl = Config::get('vdocipher.otp_ttl', 300);
+        $this->otpTtl     = Config::get('vdocipher.otp_ttl', 300);
     }
 
     /**
@@ -51,7 +52,7 @@ class VdoCipherService implements VdoCipherInterface
      */
     public function getVideoDetails(string $videoId, array $options = []): array
     {
-        $otp = $this->getOtp($videoId, $options);
+        $otp   = $this->getOtp($videoId, $options);
         $video = $this->getVideo($videoId);
 
         return array_merge($video, ['otp' => $otp]);
@@ -72,25 +73,61 @@ class VdoCipherService implements VdoCipherInterface
 
         // Add userId if provided
         if (isset($options['userId'])) {
-            $payload['annotate'] = json_encode([
-                'userId' => $options['userId']
-            ]);
+            $payload['userId'] = $options['userId'];
         }
 
         // Merge watermarks if they are not explicitly disabled
-        if (!isset($options['watermarks']) || $options['watermarks'] !== false) {
+        if (! isset($options['watermarks']) || $options['watermarks'] !== false) {
             $watermarks = $options['watermarks'] ?? $this->watermarks;
-            if (!empty($watermarks)) {
-                $payload['watermark'] = json_encode($watermarks);
+            if (! empty($watermarks)) {
+                $payload['annotate'] = json_encode($watermarks);
             }
         }
 
         $response = Http::withHeaders([
             'Authorization' => 'Apisecret ' . $this->apiKey,
-            'Content-Type' => 'application/json',
+            'Content-Type'  => 'application/json',
         ])->post("{$this->baseUrl}/videos/{$videoId}/otp", $payload);
 
-        return $response->json();
+        return $this->handleResponse($response);
+    }
+
+    /**
+     * Generate OTP for offline video playback (persistent encrypted download).
+     *
+     * @param string $videoId The ID of the video
+     * @param int $rentalDuration Rental duration in seconds (default: 15 days)
+     * @param array $extra Optional extra OTP options (e.g., watermark, userId)
+     * @return array
+     */
+    public function getOfflineOtp(string $videoId, int $rentalDuration = 1296000, array $extra = []): array
+    {
+        $payload = [
+            'licenseRules' => json_encode([
+                'canPersist'     => true,
+                'rentalDuration' => $rentalDuration,
+            ]),
+        ];
+
+        if (isset($extra['ttl'])) {
+            $payload['ttl'] = $extra['ttl'];
+        }
+
+        if (isset($extra['userId'])) {
+            $payload['userId'] = $extra['userId'];
+        }
+
+        if (isset($extra['watermarks']) && $extra['watermarks'] !== false) {
+            $payload['watermark'] = $extra['watermarks'];
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Apisecret ' . $this->apiKey,
+            'Content-Type'  => 'application/json',
+            'Accept'        => 'application/json',
+        ])->post("{$this->baseUrl}/videos/{$videoId}/otp", $payload);
+
+        return $this->handleResponse($response);
     }
 
     /**
@@ -105,7 +142,7 @@ class VdoCipherService implements VdoCipherInterface
             'Authorization' => 'Apisecret ' . $this->apiKey,
         ])->get("{$this->baseUrl}/meta/{$videoId}");
 
-        return $response->json() ?? [];
+        return $this->handleResponse($response);
     }
 
     /**
@@ -138,7 +175,7 @@ class VdoCipherService implements VdoCipherInterface
             'Authorization' => 'Apisecret ' . $this->apiKey,
         ])->get("{$this->baseUrl}/videos", $params);
 
-        return $response->json() ?? [];
+        return $this->handleResponse($response);
     }
 
     /**
@@ -153,7 +190,7 @@ class VdoCipherService implements VdoCipherInterface
             'Authorization' => 'Apisecret ' . $this->apiKey,
         ])->get("{$this->baseUrl}/videos/{$videoId}");
 
-        return $response->json() ?? [];
+        return $this->handleResponse($response);
     }
 
     /**
@@ -181,18 +218,16 @@ class VdoCipherService implements VdoCipherInterface
     public function getVideoCredentials(string $title, ?string $folderId = null): array
     {
         $query = ['title' => $title];
-
         if ($folderId) {
             $query['folderId'] = $folderId;
         }
 
         $response = Http::withHeaders([
             'Authorization' => 'Apisecret ' . $this->apiKey,
-        ])->withOptions([
-            'query' => $query,
-        ])->put("{$this->baseUrl}/videos");
+        ])->withOptions(['query' => $query])
+            ->put("{$this->baseUrl}/videos");
 
-        return $response->json() ?? [];
+        return $this->handleResponse($response);
     }
 
     /**
@@ -223,9 +258,69 @@ class VdoCipherService implements VdoCipherInterface
 
         return [
             'success' => $response->status() === 201,
-            'status' => $response->status(),
-            'raw' => $response->body(),
+            'status'  => $response->status(),
+            'raw'     => $response->body(),
         ];
+    }
+
+    /**
+     * Get analytics for a video.
+     *
+     * @param string $videoId The ID of the video
+     * @param string $userId The ID of the user (max 36 chars, alphanumeric, - or _)
+     * @param int|null $ttl The TTL for the OTP in seconds
+     * @return array
+     */
+    public function getVideoAnalytics(string $videoId, string $userId, ?int $ttl = null): array
+    {
+        if (strlen($userId) > 36 || !preg_match('/^[a-zA-Z0-9\-_]+$/', $userId)) {
+            throw new \InvalidArgumentException("Invalid userId. Must be <=36 chars and only contain letters, numbers, dashes (-), or underscores (_).");
+        }
+
+        $payload = [
+            'ttl'    => $ttl ?? $this->otpTtl,
+            'userId' => $userId,
+        ];
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Apisecret ' . $this->apiKey,
+            'Content-Type'  => 'application/json',
+        ])->post("{$this->baseUrl}/videos/{$videoId}/otp", $payload);
+
+        return $this->handleResponse($response);
+    }
+
+    /**
+     * Import a video from an external URL (HTTP, HTTPS or FTP).
+     *
+     * @param string $url The direct video URL to be imported.
+     * @param string|null $folderId The folder ID to store the video (default: "root").
+     * @param string|null $title The title to assign to the imported video.
+     * @return array Response from VdoCipher API.
+     */
+    public function importVideoFromUrl(string $url, ?string $folderId = null, ?string $title = null): array
+    {
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            throw new \InvalidArgumentException("Invalid URL provided.");
+        }
+
+        $payload = ['url' => $url];
+
+        if ($folderId) {
+            $payload['folderId'] = $folderId;
+        }
+
+        if ($title) {
+            $payload['title'] = $title;
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Apisecret ' . $this->apiKey,
+            'Content-Type'  => 'application/json',
+            'Accept'        => 'application/json',
+        ])->put("{$this->baseUrl}/videos/importUrl", $payload);
+
+        return $this->handleResponse($response);
     }
 
     /**
@@ -259,5 +354,21 @@ class VdoCipherService implements VdoCipherInterface
     public function setWatermarks(array $watermarks): void
     {
         $this->watermarks = $watermarks;
+    }
+
+    protected function handleResponse(Response $response): array
+    {
+        if (! $response->successful()) {
+            $message = $response->json('message') ?? $response->body();
+            throw new \RuntimeException("VdoCipher API error ({$response->status()}): {$message}");
+        }
+
+        $data = $response->json();
+
+        if (!is_array($data)) {
+            throw new \RuntimeException("VdoCipher API response is not an array.");
+        }
+
+        return $data;
     }
 }

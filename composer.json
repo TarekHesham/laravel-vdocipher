@@ -3,6 +3,7 @@
   "description": "Laravel package for VdoCipher video platform integration",
   "type": "library",
   "license": "MIT",
+  "version": "1.1.0",
   "keywords": [
     "elfarmawy",
     "laravel",
