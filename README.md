@@ -109,48 +109,18 @@ $deleted = VdoCipher::deleteVideo('video_id');
 
 ```php
 // Get upload credentials
-$credentials = VdoCipher::getVideoCredentials('My Video Title', [
-    'description' => 'Video description',
-    'tags' => ['tag1', 'tag2'],
-]);
+$credentials = VdoCipher::getVideoCredentials('My Video Title', '7d52*******'); // folderId Optional
 
 // Upload a video file
 $uploadLink = $credentials['clientPayload']['uploadLink'];
 $formData = $credentials['clientPayload'];
 $file = $request->file('video');
 
+// Added custom redirect if needed
+// $formData['success_action_status'] = 201;
+// $formData['success_action_redirect'] = '';
+
 $uploadResult = VdoCipher::uploadVideoToApi($uploadLink, $formData, $file);
-```
-
-### Player Management
-
-```php
-// Create a custom player
-$player = VdoCipher::createPlayer([
-    'name' => 'My Custom Player',
-    'autoplay' => false,
-    'controls' => true,
-    // Add other player options
-]);
-
-// List all players
-$players = VdoCipher::listPlayers();
-
-// Update a player
-$updatedPlayer = VdoCipher::updatePlayer('player_id', [
-    'name' => 'Updated Player Name',
-    'controls' => false,
-]);
-```
-
-### Analytics
-
-```php
-// Get video analytics
-$analytics = VdoCipher::getVideoAnalytics('video_id', [
-    'startDate' => '2023-01-01',
-    'endDate' => '2023-01-31',
-]);
 ```
 
 ## Watermarks
