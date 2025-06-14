@@ -123,92 +123,11 @@ $file = $request->file('video');
 $uploadResult = VdoCipher::uploadVideoToApi($uploadLink, $formData, $file);
 ```
 
-## Watermarks
-
-The package supports configuring watermarks for videos. You can set default watermarks in the config file, or override them at runtime:
-
-```php
-// Get OTP with specific watermarks
-$otpInfo = VdoCipher::getOtp('video_id', [
-    'watermarks' => [
-        [
-            'type'     => 'rtext',
-            'text'     => 'Custom Watermark',
-            'alpha'    => '0.4',
-            'color'    => '0x00FF00',
-            'size'     => '20',
-            'interval' => '8000',
-        ],
-    ],
-]);
-
-// Get OTP without any watermarks
-$otpInfo = VdoCipher::getOtp('video_id', [
-    'watermarks' => false,
-]);
-```
-
-## Viewer-Based Analytics
-
-You can generate viewer-based OTPs by associating a unique `userId` with the playback session. This is useful for:
-
-- Tracking piracy attempts
-- Monitoring user watch patterns
-- Detecting password sharing
-- Folder-level analytics
-
-```php
-$otp = VdoCipher::getVideoAnalytics('video_id', 'user_123');
-
-// Optional: override default TTL (in seconds)
-$otp = VdoCipher::getVideoAnalytics('video_id', 'user_123', 600);
-```
-
-> **Note**: The `userId` must be a string up to 36 characters, containing only letters, numbers, dashes `-`, or underscores `_`.
-
-## Importing Video from a URL
-
-You can directly import video from a public **HTTP**, **HTTPS**, or **FTP** URL to your VdoCipher account without uploading files manually.
-
-```php
-$response = VdoCipher::importVideoFromUrl(
-    'https://example.com/video.mp4',
-    'root', // folderId (optional, "root" by default)
-    'My Imported Video Title' // video title (optional)
-);
-```
-
-## Offline Video OTP
-
-Generate an OTP that allows viewers to **download and persist** a video securely for offline playback. The license can be limited by a rental period (in seconds).
-
-```php
-// Default: 15-day rental duration
-$offlineOtp = VdoCipher::getOfflineOtp('video_id');
-
-// Custom rental duration: 7 days
-$offlineOtp = VdoCipher::getOfflineOtp('video_id', 7 * 24 * 3600, [
-    'userId' => 'user_123',
-    'ttl'    => 600,
-    'watermarks' => [
-        [
-            'type' => 'rtext',
-            'text' => 'Offline User ID: user_123',
-            'color' => '0xFF0000',
-        ]
-    ]
-]);
-```
-
-> The `licenseRules` is automatically serialized as required by VdoCipher API.
-
 ---
 
-## Testing
+## Full Documentation
 
-```bash
-composer test
-```
+For complete documentation and advanced usage, please check the [Wiki](https://github.com/TarekHesham/laravel-vdocipher/wiki).
 
 ## Changelog
 
