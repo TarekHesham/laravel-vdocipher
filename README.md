@@ -2,7 +2,7 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/ElFarmawy/vdocipher.svg?style=flat-square)](https://packagist.org/packages/ElFarmawy/vdocipher)
 [![Total Downloads](https://img.shields.io/packagist/dt/ElFarmawy/vdocipher.svg?style=flat-square)](https://packagist.org/packages/ElFarmawy/vdocipher)
-[![GitHub Tests Action Status](https://img.shields.io/github/workflow/status/TarekHesham/vdocipher/run-tests?label=tests)](https://github.com/TarekHesham/vdocipher/actions?query=workflow%3Arun-tests+branch%3Amain)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/TarekHesham/laravel-vdocipher/run-tests.yml?branch=main)](https://github.com/TarekHesham/laravel-vdocipher/actions?query=workflow%3Arun-tests+branch%3Amain)
 
 A Laravel package that provides a clean, API-only integration with the VdoCipher video platform. Supports Laravel 10, 11, and 12.
 
@@ -194,11 +194,11 @@ Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
 
 ## Security
 
-If you discover any security related issues, please email security@example.com instead of using the issue tracker.
+If you discover any security related issues, please email tarekelfarmawy@outlook.com instead of using the issue tracker.
 
 ## Credits
 
-- [Your Name](https://github.com/yourgithub)
+- [Tarek Hesham](https://github.com/TarekHesham)
 - [All Contributors](../../contributors)
 
 ## License
