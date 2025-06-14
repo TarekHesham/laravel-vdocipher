@@ -60,10 +60,10 @@ interface VdoCipherInterface
      * Get credentials for uploading a video.
      *
      * @param string $title The title of the video
-     * @param array $options Additional options for the upload
+     * @param string $folderId The ID of the folder to upload the video to
      * @return array
      */
-    public function getVideoCredentials(string $title, array $options = []): array;
+    public function getVideoCredentials(string $title, ?string $folderId = null): array;
 
     /**
      * Upload a video file to the API using the provided upload link and form data.
@@ -74,39 +74,6 @@ interface VdoCipherInterface
      * @return array
      */
     public function uploadVideoToApi(string $uploadLink, array $formData, UploadedFile $file): array;
-
-    /**
-     * Create a new player.
-     *
-     * @param array $data Player configuration data
-     * @return array
-     */
-    public function createPlayer(array $data): array;
-
-    /**
-     * List all players.
-     *
-     * @return array
-     */
-    public function listPlayers(): array;
-
-    /**
-     * Update a player.
-     *
-     * @param string $playerId The ID of the player to update
-     * @param array $data Updated player configuration data
-     * @return array
-     */
-    public function updatePlayer(string $playerId, array $data): array;
-
-    /**
-     * Get analytics for a video.
-     *
-     * @param string $videoId The ID of the video
-     * @param array $params Parameters for filtering analytics data
-     * @return array
-     */
-    public function getVideoAnalytics(string $videoId, array $params = []): array;
 
     /**
      * Set the API key.

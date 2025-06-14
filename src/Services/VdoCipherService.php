@@ -37,7 +37,7 @@ class VdoCipherService implements VdoCipherInterface
     public function __construct()
     {
         $this->apiKey = Config::get('vdocipher.api_key', '');
-        $this->baseUrl = Config::get('vdocipher.base_url', 'https://dev.vdocipher.com');
+        $this->baseUrl = Config::get('vdocipher.base_url', 'https://dev.vdocipher.com/api');
         $this->watermarks = Config::get('vdocipher.watermarks', []);
         $this->otpTtl = Config::get('vdocipher.otp_ttl', 300);
     }
@@ -88,7 +88,7 @@ class VdoCipherService implements VdoCipherInterface
         $response = Http::withHeaders([
             'Authorization' => 'Apisecret ' . $this->apiKey,
             'Content-Type' => 'application/json',
-        ])->post("{$this->baseUrl}/otp", $payload);
+        ])->post("{$this->baseUrl}/videos/{$videoId}/otp", $payload);
 
         return $response->json();
     }
@@ -103,16 +103,34 @@ class VdoCipherService implements VdoCipherInterface
     {
         $response = Http::withHeaders([
             'Authorization' => 'Apisecret ' . $this->apiKey,
-        ])->get("{$this->baseUrl}/videos/{$videoId}/metadata");
+        ])->get("{$this->baseUrl}/meta/{$videoId}");
 
-        return $response->json();
+        return $response->json() ?? [];
     }
 
     /**
-     * Get a list of videos.
+     * Get a list of videos from VdoCipher.
      *
-     * @param array $params Parameters for filtering and pagination
-     * @return array
+     * This method supports pagination and filtering options via query parameters.
+     *
+     * Available parameters:
+     * - page (int)         : Page number for pagination (e.g. 1, 2, 3).
+     * - limit (int)        : Number of videos per page (default: 20, max: 100).
+     * - tags (string)      : Comma-separated list of tags to filter by (case-sensitive).
+     * - q (string)         : Search query for video ID or title.
+     * - folderId (string)  : ID of the folder to list videos from (use "root" for top-level).
+     *
+     * Example usage:
+     * $videos = VdoCipher::getVideos([
+     *     'page' => 2,
+     *     'limit' => 40,
+     *     'tags' => 'Course1,Promo',
+     *     'q' => 'Intro',
+     *     'folderId' => 'root',
+     * ]);
+     *
+     * @param array $params Optional query parameters for filtering and pagination
+     * @return array Response data from VdoCipher API
      */
     public function getVideos(array $params = []): array
     {
@@ -120,7 +138,7 @@ class VdoCipherService implements VdoCipherInterface
             'Authorization' => 'Apisecret ' . $this->apiKey,
         ])->get("{$this->baseUrl}/videos", $params);
 
-        return $response->json();
+        return $response->json() ?? [];
     }
 
     /**
@@ -135,7 +153,7 @@ class VdoCipherService implements VdoCipherInterface
             'Authorization' => 'Apisecret ' . $this->apiKey,
         ])->get("{$this->baseUrl}/videos/{$videoId}");
 
-        return $response->json();
+        return $response->json() ?? [];
     }
 
     /**
@@ -148,112 +166,66 @@ class VdoCipherService implements VdoCipherInterface
     {
         $response = Http::withHeaders([
             'Authorization' => 'Apisecret ' . $this->apiKey,
-        ])->delete("{$this->baseUrl}/videos/{$videoId}");
+        ])->delete("{$this->baseUrl}/videos?videos={$videoId}");
 
-        return $response->successful();
+        return $response->successful() ? true : false;
     }
 
     /**
      * Get credentials for uploading a video.
      *
      * @param string $title The title of the video
-     * @param array $options Additional options for the upload
+     * @param string $folderId The ID of the folder to upload the video to
      * @return array
      */
-    public function getVideoCredentials(string $title, array $options = []): array
+    public function getVideoCredentials(string $title, ?string $folderId = null): array
     {
-        $payload = array_merge([
-            'title' => $title,
-        ], $options);
+        $query = ['title' => $title];
+
+        if ($folderId) {
+            $query['folderId'] = $folderId;
+        }
 
         $response = Http::withHeaders([
             'Authorization' => 'Apisecret ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ])->post("{$this->baseUrl}/videos/files", $payload);
+        ])->withOptions([
+            'query' => $query,
+        ])->put("{$this->baseUrl}/videos");
 
-        return $response->json();
+        return $response->json() ?? [];
     }
 
     /**
-     * Upload a video file to the API using the provided upload link and form data.
+     * Upload a video file to VdoCipher API.
      *
-     * @param string $uploadLink The upload URL
-     * @param array $formData Form data for the upload
-     * @param UploadedFile $file The file to upload
-     * @return array
+     * This should be called after obtaining upload credentials using getVideoCredentials().
+     *
+     * Note: The related videoId is returned in the getVideoCredentials() response
+     * and should be stored before calling this method.
+     *
+     * @param string $uploadLink The URL to which the video will be uploaded
+     * @param array $formData The full form data including policy, signature, etc.
+     * @param UploadedFile $file The video file to be uploaded
+     * @return array Response from VdoCipher (may be empty if upload was successful with 201)
      */
     public function uploadVideoToApi(string $uploadLink, array $formData, UploadedFile $file): array
     {
-        $response = Http::attach(
-            'file',
-            fopen($file->getRealPath(), 'r'),
-            $file->getClientOriginalName()
-        )->post($uploadLink, $formData);
+        unset($formData['uploadLink']);
 
-        return $response->json() ?: ['success' => $response->successful()];
-    }
+        $response = Http::asMultipart()
+            ->attach(
+                'file',
+                fopen($file->getRealPath(), 'r'),
+                $file->getClientOriginalName(),
+                ['Content-Type' => $file->getMimeType()]
+            )
+            ->post($uploadLink, $formData);
 
-    /**
-     * Create a new player.
-     *
-     * @param array $data Player configuration data
-     * @return array
-     */
-    public function createPlayer(array $data): array
-    {
-        $response = Http::withHeaders([
-            'Authorization' => 'Apisecret ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ])->post("{$this->baseUrl}/players", $data);
-
-        return $response->json();
-    }
-
-    /**
-     * List all players.
-     *
-     * @return array
-     */
-    public function listPlayers(): array
-    {
-        $response = Http::withHeaders([
-            'Authorization' => 'Apisecret ' . $this->apiKey,
-        ])->get("{$this->baseUrl}/players");
-
-        return $response->json();
-    }
-
-    /**
-     * Update a player.
-     *
-     * @param string $playerId The ID of the player to update
-     * @param array $data Updated player configuration data
-     * @return array
-     */
-    public function updatePlayer(string $playerId, array $data): array
-    {
-        $response = Http::withHeaders([
-            'Authorization' => 'Apisecret ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ])->put("{$this->baseUrl}/players/{$playerId}", $data);
-
-        return $response->json();
-    }
-
-    /**
-     * Get analytics for a video.
-     *
-     * @param string $videoId The ID of the video
-     * @param array $params Parameters for filtering analytics data
-     * @return array
-     */
-    public function getVideoAnalytics(string $videoId, array $params = []): array
-    {
-        $response = Http::withHeaders([
-            'Authorization' => 'Apisecret ' . $this->apiKey,
-        ])->get("{$this->baseUrl}/videos/{$videoId}/analytics", $params);
-
-        return $response->json() ?: [];
+        return [
+            'success' => $response->status() === 201,
+            'status' => $response->status(),
+            'raw' => $response->body(),
+        ];
     }
 
     /**

@@ -28,7 +28,7 @@ Update your `.env` file with your VdoCipher API key:
 
 ```
 VDOCIPHER_API_KEY=your-api-key
-VDOCIPHER_BASE_URL=https://dev.vdocipher.com
+VDOCIPHER_BASE_URL=https://dev.vdocipher.com/api
 VDOCIPHER_OTP_TTL=300
 ```
 
@@ -80,7 +80,7 @@ You can override the default configuration at runtime:
 VdoCipher::setApiKey('new-api-key');
 
 // Override base URL
-VdoCipher::setBaseUrl('https://custom-dev.vdocipher.com');
+VdoCipher::setBaseUrl('https://custom-dev.vdocipher.com/api');
 
 // Override default watermarks
 VdoCipher::setWatermarks([

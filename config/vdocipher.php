@@ -21,7 +21,7 @@ return [
     | change this value unless VdoCipher changes their API endpoint.
     |
     */
-    'base_url' => env('VDOCIPHER_BASE_URL', 'https://dev.vdocipher.com'),
+    'base_url' => env('VDOCIPHER_BASE_URL', 'https://dev.vdocipher.com/api'),
 
     /*
     |--------------------------------------------------------------------------
