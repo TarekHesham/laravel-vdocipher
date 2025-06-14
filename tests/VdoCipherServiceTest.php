@@ -63,8 +63,8 @@ class VdoCipherServiceTest extends TestCase
             $body = json_decode($request->body(), true);
 
             $this->assertArrayHasKey('ttl', $body);
-            $this->assertArrayHasKey('watermark', $body);
-            $this->assertNotEmpty($body['watermark']);
+            $this->assertArrayHasKey('annotate', $body);
+            $this->assertNotEmpty($body['annotate']);
 
             return true;
         });
@@ -126,10 +126,9 @@ class VdoCipherServiceTest extends TestCase
             $body = json_decode($request->body(), true);
 
             $this->assertArrayHasKey('ttl', $body);
-            $this->assertArrayHasKey('watermark', $body);
+            $this->assertArrayHasKey('annotate', $body);
 
-            // تأكد من التطابق الكامل بين watermark المُرسلة والمتوقعة
-            $this->assertEquals(json_encode($customWatermarks), $body['watermark']);
+            $this->assertEquals(json_encode($customWatermarks), $body['annotate']);
 
             return true;
         });
@@ -277,5 +276,80 @@ class VdoCipherServiceTest extends TestCase
         $property = $reflection->getProperty('watermarks');
         $property->setAccessible(true);
         $this->assertEquals($newWatermarks, $property->getValue($service));
+    }
+
+    public function testGetVideoAnalyticsGeneratesOtp()
+    {
+        Http::fake([
+            'https://dev.vdocipher.com/api/videos/video456/otp' => Http::response([
+                'otp' => 'analytics-otp-token',
+            ], 200),
+        ]);
+
+        $result = VdoCipher::getVideoAnalytics('video456', 'user_test');
+
+        Http::assertSent(function ($request) {
+            $this->assertEquals('https://dev.vdocipher.com/api/videos/video456/otp', $request->url());
+
+            $body = json_decode($request->body(), true);
+            $this->assertEquals('user_test', $body['userId']);
+            $this->assertArrayHasKey('ttl', $body);
+
+            return true;
+        });
+
+        $this->assertEquals('analytics-otp-token', $result['otp']);
+    }
+
+    public function testImportVideoFromUrlReturnsVideoInfo()
+    {
+        Http::fake([
+            'https://dev.vdocipher.com/api/videos/importUrl' => Http::response([
+                'id'     => '4b02d06e4b374f6085edc4061a0dc3fb',
+                'status' => 'Queued',
+                'title'  => 'Test Imported Title',
+            ], 200),
+        ]);
+
+        $result = VdoCipher::importVideoFromUrl('https://example.com/video.mp4', 'root', 'Test Imported Title');
+
+        Http::assertSent(function ($request) {
+            $this->assertEquals('https://dev.vdocipher.com/api/videos/importUrl', $request->url());
+
+            $body = json_decode($request->body(), true);
+            $this->assertEquals('https://example.com/video.mp4', $body['url']);
+            $this->assertEquals('root', $body['folderId']);
+            $this->assertEquals('Test Imported Title', $body['title']);
+
+            return true;
+        });
+
+        $this->assertEquals('Queued', $result['status']);
+        $this->assertEquals('4b02d06e4b374f6085edc4061a0dc3fb', $result['id']);
+    }
+
+    public function testGetOfflineOtpWithDefaultRentalDuration()
+    {
+        Http::fake([
+            'https://dev.vdocipher.com/api/videos/video789/otp' => Http::response([
+                'otp' => 'offline-otp-token',
+            ], 200),
+        ]);
+
+        $result = VdoCipher::getOfflineOtp('video789');
+
+        Http::assertSent(function ($request) {
+            $this->assertEquals('https://dev.vdocipher.com/api/videos/video789/otp', $request->url());
+
+            $body = json_decode($request->body(), true);
+            $rules = json_decode($body['licenseRules'], true);
+
+            $this->assertTrue($rules['canPersist']);
+            $this->assertEquals(1296000, $rules['rentalDuration']); // 15 days
+
+            return true;
+        });
+
+        $this->assertEquals('offline-otp-token', $result['otp']);
     }
 }
